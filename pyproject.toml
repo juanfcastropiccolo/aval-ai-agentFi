@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aval"
+version = "0.1.0"
+description = "Capa de confianza framework-agnóstica para agentes de IA que manejan dinero: enforcement de permisos acotado, auditable y verificable."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "aval" }]
+dependencies = [
+    "pydantic>=2.5",
+    "eth-abi>=5.0",
+    "eth-utils>=4.0",
+]
+
+[project.optional-dependencies]
+adk = ["google-adk>=0.3"]
+langchain = ["langchain>=1.0", "langgraph>=1.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["aval"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["aval/core", "aval/policies", "aval/models"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

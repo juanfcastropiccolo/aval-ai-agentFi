@@ -1,0 +1,18 @@
+# Docs
+docs/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+dist/
+build/
+
+# aval audit trails (local)
+*.aval.jsonl
