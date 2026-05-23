@@ -7,6 +7,7 @@ from datetime import datetime
 from aval.core.state import Period, StateStore
 from aval.models.action import ProposedAction
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.policies.base import Policy
 
 
@@ -32,4 +33,5 @@ class RateLimit(Policy):
         return PolicyResult.deny(
             self.name,
             f"límite de {self.max_actions} acciones por {self.per} alcanzado (usadas {used})",
+            ReasonCode.RATE_LIMIT,
         )

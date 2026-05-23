@@ -16,3 +16,6 @@ build/
 
 # aval audit trails (local)
 *.aval.jsonl
+
+# Secrets / config local (llaves de testnet, RPC, etc.)
+.env

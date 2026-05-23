@@ -6,6 +6,7 @@ from aval.models.decision import Decision
 from aval.models.mandate import Mandate
 from aval.models.policy import Policy
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.models.verdict import Verdict
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "Policy",
     "PolicyResult",
     "ProposedAction",
+    "ReasonCode",
     "Verdict",
 ]

@@ -7,6 +7,7 @@ from datetime import datetime
 from aval.core.state import StateStore
 from aval.models.action import ProposedAction
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.policies.base import Policy
 
 
@@ -26,4 +27,6 @@ class AllowedMethods(Policy):
             return PolicyResult.not_applicable(self.name)
         if action.method in self.methods:
             return PolicyResult.allow(self.name, "método permitido")
-        return PolicyResult.deny(self.name, f"método no permitido: {action.method}")
+        return PolicyResult.deny(
+            self.name, f"método no permitido: {action.method}", ReasonCode.METHOD_NOT_ALLOWED
+        )

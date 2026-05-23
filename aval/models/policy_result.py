@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from aval.models.reason_code import ReasonCode
 from aval.models.verdict import Verdict
 
 
@@ -23,14 +24,23 @@ class PolicyResult(BaseModel):
     reason: str
     policy_name: str
     applicable: bool = True
+    reason_code: ReasonCode = ReasonCode.OK
 
     @classmethod
     def allow(cls, policy_name: str, reason: str = "ok") -> PolicyResult:
         return cls(passed=True, verdict=Verdict.ALLOW, reason=reason, policy_name=policy_name)
 
     @classmethod
-    def deny(cls, policy_name: str, reason: str) -> PolicyResult:
-        return cls(passed=False, verdict=Verdict.DENY, reason=reason, policy_name=policy_name)
+    def deny(
+        cls, policy_name: str, reason: str, reason_code: ReasonCode = ReasonCode.DEFAULT_DENY
+    ) -> PolicyResult:
+        return cls(
+            passed=False,
+            verdict=Verdict.DENY,
+            reason=reason,
+            policy_name=policy_name,
+            reason_code=reason_code,
+        )
 
     @classmethod
     def escalate(cls, policy_name: str, reason: str) -> PolicyResult:

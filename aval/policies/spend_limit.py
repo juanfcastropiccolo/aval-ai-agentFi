@@ -8,6 +8,7 @@ from decimal import Decimal
 from aval.core.state import Period, StateStore
 from aval.models.action import ProposedAction
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.policies.base import Policy
 
 
@@ -39,7 +40,9 @@ class SpendLimit(Policy):
 
         if action.amount is None:
             return PolicyResult.deny(
-                self.name, f"monto no resuelto para {self.token} con límite de gasto"
+                self.name,
+                f"monto no resuelto para {self.token} con límite de gasto",
+                ReasonCode.UNRESOLVABLE,
             )
 
         amount = action.amount
@@ -48,6 +51,7 @@ class SpendLimit(Policy):
             return PolicyResult.deny(
                 self.name,
                 f"monto {amount} {self.token} excede el límite por transacción {self.per_tx}",
+                ReasonCode.SPEND_LIMIT_PER_TX,
             )
 
         if self.per_day is not None:
@@ -57,6 +61,7 @@ class SpendLimit(Policy):
                     self.name,
                     f"gasto diario {prior + amount} {self.token} excede el límite "
                     f"{self.per_day} (previo {prior})",
+                    ReasonCode.SPEND_LIMIT_DAILY,
                 )
 
         return PolicyResult.allow(self.name, f"dentro de los límites de {self.token}")

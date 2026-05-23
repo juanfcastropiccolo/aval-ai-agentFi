@@ -9,6 +9,7 @@ from pydantic import field_validator
 from aval.core.state import StateStore
 from aval.models.action import ProposedAction
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.policies.base import Policy
 
 
@@ -33,4 +34,8 @@ class RecipientAllowlist(Policy):
             return PolicyResult.not_applicable(self.name)
         if action.recipient.lower() in self.recipients:
             return PolicyResult.allow(self.name, "destinatario permitido")
-        return PolicyResult.deny(self.name, f"destino no permitido: {action.recipient}")
+        return PolicyResult.deny(
+            self.name,
+            f"destino no permitido: {action.recipient}",
+            ReasonCode.RECIPIENT_NOT_ALLOWED,
+        )

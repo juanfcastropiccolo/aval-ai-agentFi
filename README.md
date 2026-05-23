@@ -148,11 +148,61 @@ Las acciones que **no** mueven dinero hacen pass-through limpio, sin interferenc
 - **Enforcement en el punto de integración.** aval protege donde envuelve al agente;
   un proxy de firma independiente es fase posterior.
 
+## Ejecución real no-evitable: aval como co-firmante de un Safe
+
+El enforcement vía adaptador (callback/middleware) protege en el punto de integración,
+pero un agente podría, en teoría, llamar al firmante por otro lado. Para mover dinero
+real con garantía, aval se monta como **co-firmante obligatorio de un Safe 2-de-2**: la
+cuenta custodia tiene dos owners — el agente y aval — y **toda transacción requiere las
+dos firmas**. Sin la co-firma de aval no se alcanza el quórum y los fondos no se mueven.
+No es una convención: es imposible saltearlo.
+
+```
+Agente (ADK) arma una SafeTx ──┐
+  firma con su llave (1/2)      │  POST /authorize
+                                ▼
+        ┌─ servicio co-signer (proceso aislado, tiene la llave de aval) ─┐
+        │  decodifica el calldata real · evalúa el mandato · audita        │
+        │  ALLOW → firma (2/2)      DENY → no firma, devuelve razón+código  │
+        └──────────────────────────────────────────────────────────────────┘
+  con 2 firmas → execTransaction → ⛓️   |   sin la 2ª firma → nada se ejecuta
+```
+
+Instalación: `pip install "aval[safe,service]"` (y `aval[adk]` para el tool del agente).
+
+**Demo local con plata ficticia (sin configuración, sin fondos reales):**
+
+```bash
+pip install -e ".[safe,service,dev]"
+python -m examples.safe_transfer_demo
+```
+
+Despliega un Safe 2-de-2 en una blockchain en proceso y muestra una transferencia
+válida ejecutándose y dos bloqueadas (destino no permitido, monto excedido).
+
+**Tool del agente:**
+
+```python
+from aval.adapters.adk import make_transfer_tool
+agent = LlmAgent(..., tools=[make_transfer_tool(executor)])
+# "transferí 2 ETH a 0xAlice" → el tool arma la SafeTx, pide la co-firma a aval,
+# y solo ejecuta si aval autoriza.
+```
+
+**Para un demo en red pública (Sepolia):** un RPC de Sepolia, un Safe 2-de-2 real
+desplegado y fondeado vía faucet, y las dos llaves de testnet. Config por `.env`
+(`SEPOLIA_RPC_URL`, `SAFE_ADDRESS`, `AGENT_PRIVATE_KEY`, `AVAL_PRIVATE_KEY`).
+
+Limitaciones de esta capa (testnet): la llave de aval vive en el entorno del servicio
+(no grado producción — HSM/KMS es roadmap); la co-firma tiene una ventana de frescura
+acotada por el nonce del Safe (un deadline on-chain duro requiere un guard, roadmap);
+no decodifica lotes/MultiSend (fail-closed); solo transferencias (swaps/DeFi, roadmap).
+
 ## Desarrollo
 
 ```bash
-pip install -e ".[dev]"
-pytest                       # tests
+pip install -e ".[safe,service,adk,dev]"
+pytest                       # tests (los de cadena usan un EVM in-process; nada real)
 ruff check . && ruff format .
 mypy aval/core aval/policies aval/models
 ```

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from aval.core.state import StateStore
-from aval.models import Decision, Mandate, ProposedAction, Verdict
+from aval.models import Decision, Mandate, ProposedAction, ReasonCode, Verdict
 
 
 class PolicyEngine:
@@ -35,7 +35,12 @@ class PolicyEngine:
 
         for result in results:
             if result.verdict is Verdict.DENY:
-                return Decision.deny(result.reason, failed_policy=result.policy_name, action=action)
+                return Decision.deny(
+                    result.reason,
+                    failed_policy=result.policy_name,
+                    action=action,
+                    reason_code=result.reason_code,
+                )
 
         for result in results:
             if result.verdict is Verdict.ESCALATE:
@@ -49,5 +54,7 @@ class PolicyEngine:
             return Decision.allow(reason, action=action)
 
         return Decision.deny(
-            "ninguna política del mandato autoriza esta acción (default-deny)", action=action
+            "ninguna política del mandato autoriza esta acción (default-deny)",
+            action=action,
+            reason_code=ReasonCode.DEFAULT_DENY,
         )

@@ -10,6 +10,7 @@ from pydantic import field_validator
 from aval.core.state import StateStore
 from aval.models.action import ProposedAction
 from aval.models.policy_result import PolicyResult
+from aval.models.reason_code import ReasonCode
 from aval.policies.base import Policy
 
 
@@ -44,5 +45,7 @@ class TimeWindow(Policy):
         if in_window:
             return PolicyResult.allow(self.name, f"dentro de la franja {self.start}-{self.end}")
         return PolicyResult.deny(
-            self.name, f"fuera de la franja horaria permitida {self.start}-{self.end} ({self.tz})"
+            self.name,
+            f"fuera de la franja horaria permitida {self.start}-{self.end} ({self.tz})",
+            ReasonCode.TIME_WINDOW,
         )

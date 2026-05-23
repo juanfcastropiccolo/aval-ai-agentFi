@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from aval.models.action import ProposedAction
+from aval.models.reason_code import ReasonCode
 from aval.models.verdict import Verdict
 
 
@@ -29,6 +30,7 @@ class Decision(BaseModel):
     failed_policy: str | None = None
     action: ProposedAction | None = None
     entry_hash: str | None = None
+    reason_code: ReasonCode = ReasonCode.OK
     timestamp: datetime = Field(default_factory=_now)
 
     @property
@@ -57,12 +59,14 @@ class Decision(BaseModel):
         reason: str,
         failed_policy: str | None = None,
         action: ProposedAction | None = None,
+        reason_code: ReasonCode = ReasonCode.DEFAULT_DENY,
     ) -> Decision:
         return cls(
             verdict=Verdict.DENY,
             reason=reason,
             failed_policy=failed_policy,
             action=action,
+            reason_code=reason_code,
         )
 
     @classmethod

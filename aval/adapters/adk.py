@@ -53,7 +53,39 @@ def make_before_tool_callback(engine: Engine, mandate: Mandate) -> ADKCallback:
             "aval_denied": True,
             "verdict": decision.verdict.value,
             "reason": decision.reason,
+            "reason_code": decision.reason_code.value,
             "failed_policy": decision.failed_policy,
         }
 
     return before_tool_callback
+
+
+def make_transfer_tool(executor: SafeTransferExecutor) -> Callable[..., dict[str, Any]]:
+    """Crea el tool ADK ``transfer_funds`` gateado por el co-signer de aval.
+
+    El enforcement no-evitable lo da el Safe 2-de-2 (no este tool): aunque el
+    agente llame al tool, sin la co-firma de aval la transacción no alcanza el
+    threshold y no se ejecuta. Registralo en el agente::
+
+        agent = LlmAgent(..., tools=[make_transfer_tool(executor)])
+    """
+
+    def transfer_funds(recipient: str, amount: float, token: str) -> dict[str, Any]:
+        """Transfiere fondos desde el Safe a ``recipient``, sujeto a la co-autorización de aval.
+
+        Args:
+            recipient: dirección destino (0x...).
+            amount: monto en unidades humanas del token (p. ej. 10 = 10 USDC).
+            token: símbolo del token (p. ej. "USDC" o "ETH").
+
+        Returns:
+            dict con ``executed`` (bool), ``verdict``, ``reason``, ``reason_code``,
+            ``tx_hash`` (si se ejecutó) y ``safe_tx_hash``.
+        """
+        return executor.transfer(recipient, amount, token)
+
+    return transfer_funds
+
+
+if TYPE_CHECKING:
+    from aval.execution.transfer_executor import SafeTransferExecutor

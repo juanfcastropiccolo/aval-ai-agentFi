@@ -14,9 +14,9 @@ from typing import Any
 from aval.core.audit import AuditStore, InMemoryAuditStore
 from aval.core.human_review import ConsoleHumanReviewer, HumanReviewer
 from aval.core.policy_engine import PolicyEngine
-from aval.core.resolver import EVMResolver, ResolveStatus
+from aval.core.resolver import EVMResolver, ResolverResult, ResolveStatus
 from aval.core.state import InMemoryStateStore, StateStore
-from aval.models import Decision, Mandate, ProposedAction, Verdict
+from aval.models import Decision, Mandate, ProposedAction, ReasonCode, Verdict
 
 
 class Engine:
@@ -42,6 +42,10 @@ class Engine:
     def audit(self) -> AuditStore:
         return self._audit
 
+    @property
+    def resolver(self) -> EVMResolver:
+        return self._resolver
+
     def evaluate(
         self,
         tool_name: str,
@@ -53,13 +57,36 @@ class Engine:
         now = now or datetime.now(UTC)
         try:
             result = self._resolver.resolve(tool_name, args)
+        except Exception as exc:
+            decision = Decision.deny(
+                f"error al resolver la acción (fail-closed): {exc}",
+                reason_code=ReasonCode.EVAL_ERROR,
+            )
+            return self._record_then(decision, mandate, now, None, commit=False)
+        return self.evaluate_result(result, mandate, now)
 
+    def evaluate_result(
+        self,
+        result: ResolverResult,
+        mandate: Mandate,
+        now: datetime | None = None,
+    ) -> Decision:
+        """Evalúa un resultado del resolver ya producido (reusado por el co-signer).
+
+        Permite que otros puntos de integración (p. ej. el Authorizer de Safe)
+        decodifiquen por su cuenta y reusen la misma lógica de decisión + audit.
+        """
+        now = now or datetime.now(UTC)
+        try:
             # FR-11: las acciones no financieras pasan sin enforcement ni audit.
             if result.status is ResolveStatus.PASS_THROUGH:
                 return Decision.allow("pass-through: acción no financiera")
 
             if result.status is ResolveStatus.UNRESOLVABLE:
-                decision = Decision.deny(f"acción no resoluble (fail-closed): {result.reason}")
+                decision = Decision.deny(
+                    f"acción no resoluble (fail-closed): {result.reason}",
+                    reason_code=ReasonCode.UNRESOLVABLE,
+                )
                 return self._record_then(decision, mandate, now, None, commit=False)
 
             action = result.action
@@ -67,8 +94,11 @@ class Engine:
 
             # FR-13: mandato expirado o revocado deniega toda acción de dinero.
             if not mandate.is_active(now):
-                reason = "mandato revocado" if mandate.revoked else "mandato expirado"
-                decision = Decision.deny(reason, action=action)
+                if mandate.revoked:
+                    reason, code = "mandato revocado", ReasonCode.MANDATE_REVOKED
+                else:
+                    reason, code = "mandato expirado", ReasonCode.MANDATE_EXPIRED
+                decision = Decision.deny(reason, action=action, reason_code=code)
                 return self._record_then(decision, mandate, now, action, commit=False)
 
             decision = self._policy_engine.evaluate(action, mandate, self._state, now)
@@ -80,7 +110,10 @@ class Engine:
             return self._record_then(decision, mandate, now, action, commit=decision.is_allow)
 
         except Exception as exc:  # error inesperado ⇒ deny y registrar (nunca autoriza)
-            decision = Decision.deny(f"error durante la evaluación (fail-closed): {exc}")
+            decision = Decision.deny(
+                f"error durante la evaluación (fail-closed): {exc}",
+                reason_code=ReasonCode.EVAL_ERROR,
+            )
             return self._record_then(decision, mandate, now, None, commit=False)
 
     def _resolve_escalation(self, decision: Decision, action: ProposedAction) -> Decision:
@@ -91,6 +124,7 @@ class Engine:
             f"rechazado por humano ({decision.reason})",
             failed_policy=decision.failed_policy,
             action=action,
+            reason_code=ReasonCode.HUMAN_REJECTED,
         )
 
     def _record_then(
@@ -119,7 +153,9 @@ class Engine:
             )
         except Exception as exc:
             return Decision.deny(
-                f"fallo al registrar en el audit trail (fail-closed): {exc}", action=action
+                f"fallo al registrar en el audit trail (fail-closed): {exc}",
+                action=action,
+                reason_code=ReasonCode.AUDIT_FAILURE,
             )
 
         final = decision.with_entry_hash(entry.entry_hash)

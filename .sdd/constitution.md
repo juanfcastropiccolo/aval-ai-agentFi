@@ -55,3 +55,5 @@ aval es una librería framework-agnóstica que da a los agentes de IA una **capa
 | 2026-05-22 | Mandato evaluado in-process con esquema compatible-AP2 (no VC firmada ni onchain aún) | MVP rápido y demostrable sin encerrar el diseño futuro | 001 |
 | 2026-05-22 | Crypto/EVM primero | Encaja con la tesis AgentFi y con la auditabilidad onchain | 001 |
 | 2026-05-22 | Commits manuales — aval nunca corre git add/commit/push | El usuario controla qué entra al historial | n/a |
+| 2026-05-23 | Feature 002 = aval como co-firmante no-evitable de un Safe 2-de-2 (off-chain co-signer, fail-closed, Sepolia primero) | Enforcement no-evitable para plata real sin que aval custodie ni mueva fondos | 002 |
+| 2026-05-23 | Adoptar del análisis CT+FP: la co-firma como freshness proof (deadline corto + binding al nonce) y reason_codes estructurados; concurrencia (reserve/settle), proof bundles, threshold M-de-N y Mandate-como-token-firmado quedan en roadmap | Cierra la ventana firma↔ejecución y mejora explicabilidad; el resto alinea con la tesis de track-record y estándares (AP2/ERC-8004) | 002, roadmap |

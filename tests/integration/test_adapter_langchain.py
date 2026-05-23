@@ -40,7 +40,7 @@ def _middleware() -> AvalMiddleware:
         chains=["ethereum"],
         policies=[RecipientAllowlist(recipients={GOOD}), AllowedMethods(methods={"transfer"})],
         token_decimals={"USDC": 6},
-        expires_at=NOW + timedelta(days=1),
+        expires_at=NOW + timedelta(days=3650),  # lejano: el middleware usa el reloj real
     )
     return AvalMiddleware(engine, mandate)
 
