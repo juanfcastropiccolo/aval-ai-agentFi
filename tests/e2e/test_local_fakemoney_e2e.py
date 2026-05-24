@@ -36,6 +36,7 @@ from aval.execution.chain import SafeChain  # noqa: E402
 from aval.execution.cosigner_client import CosignerClient  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.service import create_app  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.execution.transfer_executor import SafeTransferExecutor, TokenSpec  # noqa: E402
 from aval.models import Mandate  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
@@ -103,7 +104,7 @@ def _build_cosigner(env: dict[str, object], mandate: Mandate, state: object) -> 
         {SAFE_TX_TOOL}, tokens={}, default_chain=str(env["chain_id"])
     )
     engine = Engine(resolver, state_store=state)  # type: ignore[arg-type]
-    authorizer = Authorizer(engine, env["aval"].key.hex())  # type: ignore[union-attr]
+    authorizer = Authorizer(engine, RawKeySigner(env["aval"].key.hex()))  # type: ignore[union-attr]
     app = create_app(authorizer, {env["safe_addr"]: mandate})  # type: ignore[dict-item]
     return CosignerClient(client=TestClient(app))
 

@@ -8,26 +8,30 @@ vivir en un proceso separado del agente (FR-3).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
-
-from eth_account import Account
 
 from aval.core.engine import Engine
 from aval.execution.decode import decode_safe_tx
 from aval.execution.models import AuthorizationResponse, ExecutionReport, SafeTxRequest
-from aval.execution.safe_tx import compute_safe_tx_hash, sign_safe_tx_hash
+from aval.execution.safe_tx import compute_safe_tx_hash
+from aval.execution.signer import Signer
 from aval.models import AuditEntry, Mandate, Verdict
+
+logger = logging.getLogger("aval.cosigner")
 
 
 class Authorizer:
-    """Evalúa una SafeTx contra el mandato y co-firma si el veredicto es ALLOW."""
+    """Evalúa una SafeTx contra el mandato y co-firma si el veredicto es ALLOW.
 
-    def __init__(
-        self, engine: Engine, aval_private_key: str, freshness_window_s: int = 120
-    ) -> None:
+    Firma vía un ``Signer`` custodiado (KMS/keystore): la clave nunca aparece en
+    texto plano en este componente.
+    """
+
+    def __init__(self, engine: Engine, signer: Signer, freshness_window_s: int = 120) -> None:
         self._engine = engine
-        self._key = aval_private_key
-        self._address = Account.from_key(aval_private_key).address
+        self._signer = signer
+        self._address = signer.address
         self._window_s = freshness_window_s
         # safe_tx_hash → instante en que se emitió la co-firma (ventana de frescura, FR-5).
         self._issued: dict[str, datetime] = {}
@@ -51,8 +55,17 @@ class Authorizer:
         result = decode_safe_tx(self._engine.resolver, req)
         decision = self._engine.evaluate_result(result, mandate, now)
 
+        # Observabilidad: se registran veredicto/código/agente/hash, NUNCA la clave ni secretos.
+        logger.info(
+            "aval decision verdict=%s code=%s agent=%s safe_tx_hash=%s",
+            decision.verdict.value,
+            decision.reason_code.value,
+            mandate.agent_id,
+            safe_tx_hash,
+        )
+
         if decision.is_allow:
-            signature = sign_safe_tx_hash(safe_tx_hash, self._key)
+            signature = self._signer.sign_hash(safe_tx_hash)
             self._issued[safe_tx_hash] = now  # registrar para la ventana de frescura
             return AuthorizationResponse(decision=decision, aval_signature=signature)
         return AuthorizationResponse(decision=decision, aval_signature=None)

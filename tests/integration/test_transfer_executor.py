@@ -20,6 +20,7 @@ from aval.execution.authorizer import Authorizer  # noqa: E402
 from aval.execution.cosigner_client import CosignerClient  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.service import create_app  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.execution.transfer_executor import SafeTransferExecutor, TokenSpec  # noqa: E402
 from aval.models import Mandate  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
@@ -50,7 +51,7 @@ def _live_cosigner() -> CosignerClient:
     resolver = EVMResolver.from_tool_names(
         {SAFE_TX_TOOL}, tokens={USDC.lower(): TokenInfo("USDC", 6)}
     )
-    authorizer = Authorizer(Engine(resolver), Account.create().key.hex())
+    authorizer = Authorizer(Engine(resolver), RawKeySigner(Account.create().key.hex()))
     app = create_app(authorizer, {SAFE: _mandate()})
     return CosignerClient(client=TestClient(app))
 

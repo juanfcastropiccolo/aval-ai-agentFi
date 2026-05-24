@@ -13,6 +13,7 @@ from aval.core.resolver import EVMResolver, TokenInfo  # noqa: E402
 from aval.execution.authorizer import Authorizer  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.safe_tx import build_erc20_transfer, signer_of  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.models import Mandate, ReasonCode, Verdict  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
 
@@ -29,7 +30,7 @@ def _authorizer() -> Authorizer:
     )
     engine = Engine(resolver)
     aval_key = Account.create().key.hex()
-    return Authorizer(engine, aval_key)
+    return Authorizer(engine, RawKeySigner(aval_key))
 
 
 def _mandate() -> Mandate:

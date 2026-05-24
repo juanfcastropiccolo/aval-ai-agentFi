@@ -18,6 +18,7 @@ from aval.execution.authorizer import Authorizer  # noqa: E402
 from aval.execution.cosigner_client import CosignerClient  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.service import create_app  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.execution.transfer_executor import SafeTransferExecutor, TokenSpec  # noqa: E402
 from aval.models import Mandate, Verdict  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
@@ -33,7 +34,7 @@ def test_authorization_and_execution_entries_are_linked() -> None:
         {SAFE_TX_TOOL}, tokens={USDC.lower(): TokenInfo("USDC", 6)}
     )
     engine = Engine(resolver)  # InMemoryAuditStore por defecto
-    authorizer = Authorizer(engine, Account.create().key.hex())
+    authorizer = Authorizer(engine, RawKeySigner(Account.create().key.hex()))
     mandate = Mandate(
         agent_id="agent-1",
         granted_by="dev",

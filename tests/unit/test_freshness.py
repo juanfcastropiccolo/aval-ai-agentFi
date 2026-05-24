@@ -12,6 +12,7 @@ from aval.core.resolver import EVMResolver, TokenInfo  # noqa: E402
 from aval.execution.authorizer import Authorizer  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.safe_tx import build_erc20_transfer, signer_of  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.models import Mandate  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist  # noqa: E402
 
@@ -26,7 +27,9 @@ def _authorizer(window_s: int = 120) -> Authorizer:
     resolver = EVMResolver.from_tool_names(
         {SAFE_TX_TOOL}, tokens={USDC.lower(): TokenInfo("USDC", 6)}
     )
-    return Authorizer(Engine(resolver), Account.create().key.hex(), freshness_window_s=window_s)
+    return Authorizer(
+        Engine(resolver), RawKeySigner(Account.create().key.hex()), freshness_window_s=window_s
+    )
 
 
 def _mandate() -> Mandate:

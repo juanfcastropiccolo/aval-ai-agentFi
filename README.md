@@ -198,10 +198,61 @@ Limitaciones de esta capa (testnet): la llave de aval vive en el entorno del ser
 acotada por el nonce del Safe (un deadline on-chain duro requiere un guard, roadmap);
 no decodifica lotes/MultiSend (fail-closed); solo transferencias (swaps/DeFi, roadmap).
 
+## Endurecimiento para producción: N nodos, KMS y umbral M-de-N
+
+El co-signer único con la llave en `.env` sirve para demos, no para plata real. Para
+producción, aval se despliega como **N co-autorizadores independientes**, cada uno un
+servicio separado, autenticado, con su clave **custodiada** — y el Safe se crea con
+`N+1` owners (agente + N aval) y umbral `M+1` (agente + M co-firmas). Sin M co-firmas de
+aval, nada se ejecuta; comprometer menos de M nodos no alcanza; si uno se cae, los demás
+siguen.
+
+Instalación: `pip install "aval[safe,service,kms]"`.
+
+**Custodia de la clave (abstracción `Signer`):**
+
+| Backend | Cuándo | Cómo |
+|---------|--------|------|
+| `KmsSigner` | producción | clave secp256k1 en AWS KMS; **nunca sale** del KMS. `AVAL_SIGNER=kms`, `AVAL_KMS_KEY_ID=...` |
+| `LocalKeystoreSigner` | dev | keystore JSON v3 cifrado por passphrase. `AVAL_SIGNER=keystore`, `AVAL_KEYSTORE_PATH`, `AVAL_KEYSTORE_PASSPHRASE` |
+| `RawKeySigner` | solo tests/ejemplos | clave en memoria — **no usar en producción** |
+
+**Levantar un nodo co-autorizador:**
+
+```python
+# mi_nodo.py
+from aval.execution.node import build_node_app, signer_from_env
+from aval.models import Mandate
+app = build_node_app(
+    signer_from_env(),                 # KMS/keystore según AVAL_SIGNER
+    {SAFE_ADDRESS: Mandate(...)},      # mandato = fuente de verdad del servidor
+    auth_token="<token-del-nodo>",     # exige Authorization: Bearer en /authorize
+)
+# uvicorn mi_nodo:app --port 8001
+```
+
+Cada nodo corre por separado (puertos/hosts distintos, su propio `Signer` y token). El
+agente arma su `SafeTransferExecutor` con la **lista** de nodos y el umbral:
+
+```python
+SafeTransferExecutor(
+    ..., cosigners=[CosignerClient("http://nodo1", auth_token=...),
+                    CosignerClient("http://nodo2", auth_token=...),
+                    CosignerClient("http://nodo3", auth_token=...)],
+    threshold_m=2,    # junta 2 de 3 co-firmas (Safe con umbral 3 = agente + 2)
+)
+```
+
+Desplegar el Safe con N+1 owners / umbral M+1: `aval.execution.deploy.deploy_safe(client, deployer, owners, threshold)`.
+
+**Límites de esta capa:** sin rotación automática de claves ni revocación en caliente de
+un nodo, y sin recuperación ante pérdida de claves / timelock (feature 005). El umbral
+quita el punto único de falla; la recuperación es el siguiente paso hacia mainnet.
+
 ## Desarrollo
 
 ```bash
-pip install -e ".[safe,service,adk,dev]"
+pip install -e ".[safe,service,adk,kms,dev]"
 pytest                       # tests (los de cadena usan un EVM in-process; nada real)
 ruff check . && ruff format .
 mypy aval/core aval/policies aval/models

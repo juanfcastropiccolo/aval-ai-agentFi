@@ -18,6 +18,7 @@ from aval.execution.cosigner_client import CosignerClient, CosignerUnavailable  
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.safe_tx import build_erc20_transfer, signer_of  # noqa: E402
 from aval.execution.service import create_app  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.models import Mandate, ReasonCode, Verdict  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
 
@@ -33,7 +34,7 @@ def _client_and_addr() -> tuple[CosignerClient, str]:
         {SAFE_TX_TOOL}, tokens={USDC.lower(): TokenInfo("USDC", 6)}
     )
     engine = Engine(resolver)
-    authorizer = Authorizer(engine, Account.create().key.hex())
+    authorizer = Authorizer(engine, RawKeySigner(Account.create().key.hex()))
     mandate = Mandate(
         agent_id="agent-1",
         granted_by="dev",

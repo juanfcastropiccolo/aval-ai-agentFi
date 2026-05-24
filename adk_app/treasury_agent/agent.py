@@ -41,6 +41,7 @@ from aval.execution.chain import SafeChain  # noqa: E402
 from aval.execution.cosigner_client import CosignerClient  # noqa: E402
 from aval.execution.decode import SAFE_TX_TOOL  # noqa: E402
 from aval.execution.service import create_app  # noqa: E402
+from aval.execution.signer import RawKeySigner  # noqa: E402
 from aval.execution.transfer_executor import SafeTransferExecutor, TokenSpec  # noqa: E402
 from aval.models import Mandate  # noqa: E402
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit  # noqa: E402
@@ -84,7 +85,7 @@ _mandate = Mandate(
 # Co-signer de aval. En este demo corre in-process; en producción es un servicio
 # separado (su create_app ya está listo para uvicorn) para aislar la llave de aval.
 _resolver = EVMResolver.from_tool_names({SAFE_TX_TOOL}, tokens={}, default_chain=str(_chain_id))
-_authorizer = Authorizer(Engine(_resolver), _env["AVAL_PRIVATE_KEY"])
+_authorizer = Authorizer(Engine(_resolver), RawKeySigner(_env["AVAL_PRIVATE_KEY"]))
 _cosigner = CosignerClient(client=TestClient(create_app(_authorizer, {_safe: _mandate})))
 
 _executor = SafeTransferExecutor(

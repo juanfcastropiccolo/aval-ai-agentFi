@@ -27,6 +27,7 @@ from aval.execution.chain import SafeChain
 from aval.execution.cosigner_client import CosignerClient
 from aval.execution.decode import SAFE_TX_TOOL
 from aval.execution.service import create_app
+from aval.execution.signer import RawKeySigner
 from aval.execution.transfer_executor import SafeTransferExecutor, TokenSpec
 from aval.models import Mandate
 from aval.policies import AllowedMethods, RecipientAllowlist, SpendLimit
@@ -85,7 +86,7 @@ def main() -> None:
 
     # El co-signer de aval corre como servicio (acá in-process; en prod, separado).
     resolver = EVMResolver.from_tool_names({SAFE_TX_TOOL}, tokens={}, default_chain=str(chain_id))
-    authorizer = Authorizer(Engine(resolver), aval.key.hex())
+    authorizer = Authorizer(Engine(resolver), RawKeySigner(aval.key.hex()))
     cosigner = CosignerClient(client=TestClient(create_app(authorizer, {safe: mandate})))
 
     # El agente arma, junta 2 firmas y ejecuta.

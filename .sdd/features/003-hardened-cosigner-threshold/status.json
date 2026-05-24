@@ -1,0 +1,10 @@
+{
+  "id": "003",
+  "slug": "hardened-cosigner-threshold",
+  "title": "Co-autorización endurecida: clave custodiada (KMS) y umbral M-de-N",
+  "phase": "complete",
+  "progress_pct": 100,
+  "depends_on": ["002"],
+  "created": "2026-05-23",
+  "updated": "2026-05-23"
+}

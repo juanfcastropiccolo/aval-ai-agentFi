@@ -1,9 +1,10 @@
-"""Orquestación lado-agente de una transferencia con co-autorización de aval.
+"""Orquestación lado-agente de una transferencia con co-autorización M-de-N de aval.
 
-Arma la SafeTx, la firma con la llave del agente, pide la 2ª firma al co-signer,
-y solo si la obtiene ejecuta `execTransaction`. Ante DENY o co-signer inalcanzable,
-no ejecuta nada (fail-closed, FR-10). Es agnóstico de framework; el adaptador ADK
-lo expone como un tool.
+Arma la SafeTx, la firma con la llave del agente, pide co-firmas a N co-autorizadores
+independientes y reúne **M** de ellas. Solo si junta M (umbral M+1 del Safe contando al
+agente) ejecuta `execTransaction`. Ante menos de M autorizaciones o co-autorizadores
+inalcanzables, no ejecuta nada (fail-closed, FR-7). Es agnóstico de framework; el
+adaptador ADK lo expone como un tool.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ class TokenSpec:
 
 
 class SafeTransferExecutor:
-    """Ejecuta transferencias desde un Safe, gateadas por el co-signer de aval."""
+    """Ejecuta transferencias desde un Safe, gateadas por M-de-N co-autorizadores de aval."""
 
     def __init__(
         self,
@@ -42,17 +43,25 @@ class SafeTransferExecutor:
         chain_id: int,
         agent_private_key: str,
         chain: SafeChain,
-        cosigner: CosignerClient,
         tokens: dict[str, TokenSpec],
+        cosigner: CosignerClient | None = None,
+        cosigners: list[CosignerClient] | None = None,
+        threshold_m: int = 1,
         native_symbol: str = "ETH",
     ) -> None:
         self._safe = safe_address
         self._chain_id = chain_id
         self._agent_key = agent_private_key
         self._chain = chain
-        self._cosigner = cosigner
         self._tokens = tokens
         self._native = native_symbol
+        # Acepta un único co-autorizador (compat) o una lista (umbral M-de-N).
+        if cosigners is None:
+            cosigners = [cosigner] if cosigner is not None else []
+        if not cosigners:
+            raise ValueError("se requiere al menos un co-autorizador")
+        self._cosigners = cosigners
+        self._m = threshold_m
 
     def transfer(self, recipient: str, amount: float | str, token: str) -> dict[str, Any]:
         """Intenta transferir ``amount`` de ``token`` a ``recipient``. Nunca lanza."""
@@ -85,34 +94,44 @@ class SafeTransferExecutor:
         # 1ª firma: el agente.
         agent_sig = sign_safe_tx_hash(req.safe_tx_hash, self._agent_key)
 
-        # 2ª firma: el co-signer de aval (fail-closed si no responde).
-        try:
-            resp = self._cosigner.authorize(req)
-        except CosignerUnavailable as exc:
-            return _result(
-                False,
-                "deny",
-                f"co-signer inalcanzable (fail-closed): {exc}",
-                None,
-                req.safe_tx_hash,
+        # Reunir M co-firmas de los N co-autorizadores (cada uno evalúa el mandato por su cuenta).
+        aval_sigs: list[str] = []
+        last_reason = "ningún co-autorizador autorizó"
+        last_code: str | None = None
+        for cosigner in self._cosigners:
+            if len(aval_sigs) >= self._m:
+                break
+            try:
+                resp = cosigner.authorize(req)
+            except CosignerUnavailable:
+                last_reason = "co-autorizador inalcanzable"
+                continue
+            if resp.decision.is_allow and resp.aval_signature is not None:
+                aval_sigs.append(resp.aval_signature)
+            else:
+                last_reason = resp.decision.reason
+                last_code = resp.decision.reason_code.value
+
+        if len(aval_sigs) < self._m:
+            reason = (
+                f"co-autorizaciones insuficientes: {len(aval_sigs)}/{self._m} "
+                f"(fail-closed) — {last_reason}"
             )
+            return _result(False, "deny", reason, last_code, req.safe_tx_hash)
 
-        d = resp.decision
-        if not d.is_allow or resp.aval_signature is None:
-            return _result(False, d.verdict.value, d.reason, d.reason_code.value, req.safe_tx_hash)
-
-        # 2-de-2 alcanzado → ejecutar on-chain.
-        combined = combine_signatures(req.safe_tx_hash, [agent_sig, resp.aval_signature])
+        # Umbral alcanzado (agente + M) → ejecutar on-chain.
+        combined = combine_signatures(req.safe_tx_hash, [agent_sig, *aval_sigs])
         tx_hash = self._chain.exec_transaction(req, combined, self._agent_key)
-        # Reportar la ejecución para la 2ª entrada de audit (best-effort).
-        self._cosigner.report_execution(
-            ExecutionReport(safe_address=self._safe, safe_tx_hash=req.safe_tx_hash, tx_hash=tx_hash)
+        report = ExecutionReport(
+            safe_address=self._safe, safe_tx_hash=req.safe_tx_hash, tx_hash=tx_hash
         )
+        for cosigner in self._cosigners:  # registro de ejecución best-effort en cada nodo
+            cosigner.report_execution(report)
         return {
             "executed": True,
             "verdict": "allow",
-            "reason": d.reason,
-            "reason_code": d.reason_code.value,
+            "reason": f"ejecutada con {len(aval_sigs)}/{self._m} co-autorizaciones",
+            "reason_code": "ok",
             "tx_hash": tx_hash,
             "safe_tx_hash": req.safe_tx_hash,
         }
